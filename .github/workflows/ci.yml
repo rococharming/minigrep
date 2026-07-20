@@ -1,5 +1,9 @@
+# name 工作流名称，在 GitHub Actions 页面显示的名字
 name: Rust CI
 
+# on 触发条件，常见 pull_request 和 push
+# pull_request 表示创建 PR 时触发运行
+# push 表示提交合并到 main 时触发运行
 on:
   pull_request:
     branches:
@@ -9,25 +13,53 @@ on:
     branches:
       - main
 
+# permissions 工作流权限，控制 GitHub 自动生成的 GITHUB_TOKEN 能做什么
+# 只做 CI 检查时，通常只需要读取仓库内容。
 permissions:
   contents: read
 
+# env 全局环境变量，定义工作流、Job 或 Step 中可用的环境变量
 env:
   CARGO_TERM_COLOR: always
 
+# jobs 一组独立任务，一个工作流可以包含多个 Job。每个 Job 通常在独立机器上运行。
 jobs:
-  rust-checks:
-    name: Rust checks
-    runs-on: ubuntu-latest
+  build:
+    name: Build ${{ matrix.os }}
+    runs-on:  ${{ matrix.os }} # 根据 matrix 当前项选择运行器
+
+    strategy:
+
+      fail-fast: false   # 即使其中一个平台失败，也继续跑完其他平台。
+
+      matrix:
+        include:
+          - name: Linux x64
+            os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+
+          - name: Windows x64
+            os: windows-2025
+            target: x86_64-pc-windows-msvc
+
+          - name: macOS ARM64
+            os: macos-15
+            target: aarch64-apple-darwin
+
+          - name: macOS Intel x64
+            os: macos-15-intel
+            target: x86_64-apple-darwin
+
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v6
 
       - name: Set up Rust
         run: |
           rustup toolchain install stable --profile minimal --component rustfmt,clippy
           rustup default stable
+          rustup target add ${{ matrix.target }}
 
       - name: Check formatting
         run: cargo fmt --all -- --check
